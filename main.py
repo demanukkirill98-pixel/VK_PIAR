@@ -82,9 +82,9 @@ def send_message(token, peer_id, message):
         return False
 
 if __name__ == "__main__":
-    print(f"🤖 БОТ ЗАПУЩЕН")
-    print(f"⏱️ Интервал между кругами: {SPAM_INTERVAL} сек")
-    print(f"⏱️ Пауза между чатами: {SEND_DELAY} сек\n")
+    print(f"🤖 БОТ ЗАПУЩЕН", flush=True)
+    print(f"⏱️ Интервал между кругами: {SPAM_INTERVAL} сек", flush=True)
+    print(f"⏱️ Пауза между чатами: {SEND_DELAY} сек\n", flush=True)
     
     msg_index = 0
     round_num = 0
@@ -95,7 +95,7 @@ if __name__ == "__main__":
             chats = load_chats()
             
             if not chats:
-                print(f"[{time.strftime('%H:%M:%S')}] 📭 Нет чатов. Жду 30 сек...")
+                print(f"[{time.strftime('%H:%M:%S')}] 📭 Нет чатов. Жду 30 сек...", flush=True)
                 time.sleep(30)
                 continue
             
@@ -103,10 +103,10 @@ if __name__ == "__main__":
             msg_index += 1
             total = len(chats)
             
-            print(f"\n{'='*40}")
-            print(f"[{time.strftime('%H:%M:%S')}] 🔄 КРУГ {round_num} | Сообщение #{msg_index}")
-            print(f"📋 Чатов: {total}")
-            print(f"{'='*40}")
+            print(f"\n{'='*40}", flush=True)
+            print(f"[{time.strftime('%H:%M:%S')}] 🔄 КРУГ {round_num} | Сообщение #{msg_index}", flush=True)
+            print(f"📋 Чатов: {total}", flush=True)
+            print(f"{'='*40}", flush=True)
             
             ok = 0
             skip = 0
@@ -118,24 +118,23 @@ if __name__ == "__main__":
                     result = send_message(GROUP_TOKEN, peer_id, message)
                     
                     if result:
-                        print(f"  [{i}/{total}] ✅ {peer_id}")
+                        print(f"  [{i}/{total}] ✅ {peer_id}", flush=True)
                         ok += 1
-                        time.sleep(SEND_DELAY)  # Пауза только после успешных
+                        time.sleep(SEND_DELAY)
                     else:
                         skip += 1
-                        # Без паузы — сразу следующий
                     
                 except:
                     skip += 1
                     continue
             
             elapsed = int(time.time() - start_time)
-            print(f"\n[{time.strftime('%H:%M:%S')}] ✅ Отправлено: {ok} | ⏭️ Пропущено: {skip} | ⏱️ {elapsed} сек")
-            print(f"[{time.strftime('%H:%M:%S')}] ⏰ Жду {SPAM_INTERVAL} сек до следующего круга...")
+            print(f"\n[{time.strftime('%H:%M:%S')}] ✅ Отправлено: {ok} | ⏭️ Пропущено: {skip} | ⏱️ {elapsed} сек", flush=True)
+            print(f"[{time.strftime('%H:%M:%S')}] ⏰ Жду {SPAM_INTERVAL} сек до следующего круга...", flush=True)
             time.sleep(SPAM_INTERVAL)
             
         except KeyboardInterrupt:
-            print(f"\n👋 Завершено. Кругов: {round_num}")
+            print(f"\n👋 Завершено. Кругов: {round_num}", flush=True)
             break
         except:
             time.sleep(5)
