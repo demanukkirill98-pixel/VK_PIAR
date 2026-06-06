@@ -5,7 +5,7 @@ import os
 # ========== НАСТРОЙКИ ==========
 GROUP_TOKEN = "vk1.a.GENAzRdaR86f91rPAydFj660SgWD7ylgOKpjwrrPaDtgE64s3ZSMn02sa_QPL7IKcOsFIEgMK17_DlaTsjXVlpJb-a4eLqQcbEfCA4OnTcqbn5J5cjqwh-eyKrwxFbmdgJSKMY8PgIiwj8DRhOaOU3DvdDchvGw5ebC-ysGXDA9Cyg0-knFBsdhf_o__aoKHrR0RceQB658D-WjG5xBbqg"
 GROUP_ID = 239058698
-OWNER_ID = 835770623
+OWNER_ID = vk.com/club239058698
 
 # Храним связку: кому ответить
 # {owner_peer_id: client_peer_id}
