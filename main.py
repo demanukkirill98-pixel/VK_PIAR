@@ -2,7 +2,6 @@ import requests
 import time
 import os
 import threading
-import sys
 
 # ========== НАСТРОЙКИ ==========
 GROUP_TOKEN = "vk1.a.GENAzRdaR86f91rPAydFj660SgWD7ylgOKpjwrrPaDtgE64s3ZSMn02sa_QPL7IKcOsFIEgMK17_DlaTsjXVlpJb-a4eLqQcbEfCA4OnTcqbn5J5cjqwh-eyKrwxFbmdgJSKMY8PgIiwj8DRhOaOU3DvdDchvGw5ebC-ysGXDA9Cyg0-knFBsdhf_o__aoKHrR0RceQB658D-WjG5xBbqg"
@@ -154,6 +153,13 @@ def get_user_name(user_id):
         return f"{users[0].get('first_name', '')} {users[0].get('last_name', '')}"
     return f"id{user_id}"
 
+def get_chat_name(peer_id):
+    resp = api("messages.getConversationsById", {"peer_ids": peer_id})
+    items = resp.get("response", {}).get("items", [])
+    if items:
+        return items[0].get("chat_settings", {}).get("title", "Без названия")
+    return "Без названия"
+
 # ====== СЛУШАЕМ ======
 def listener_thread():
     global msg_index
@@ -197,6 +203,17 @@ def listener_thread():
                     from_id = msg.get("from_id", 0)
                     text = msg.get("text", "").strip()
                     action = msg.get("action", {})
+                    
+                    # === !айди В ЛС ===
+                    if peer_id < 2000000000 and text.lower() == "!айди":
+                        send_message(peer_id, f"🆔 Твой ID: {from_id}")
+                        continue
+                    
+                    # === !айди В БЕСЕДЕ ===
+                    if peer_id > 2000000000 and text.lower() == "!айди":
+                        title = get_chat_name(peer_id)
+                        send_message(peer_id, f"🆔 ID беседы: {peer_id}\n📝 {title}")
+                        continue
                     
                     # === ЛС ===
                     if peer_id < 2000000000 and from_id > 0 and not action:
@@ -285,7 +302,8 @@ def spammer_thread():
 if __name__ == "__main__":
     log(f"🤖 SKREIFF SHOP БОТ")
     log(f"📩 ЛС → ЧАТ МЕНЕДЖЕР")
-    log(f"📤 /o ID текст\n")
+    log(f"📤 /o ID текст")
+    log(f"🔍 !айди — узнать ID\n")
     
     t1 = threading.Thread(target=listener_thread, daemon=True)
     t1.start()
