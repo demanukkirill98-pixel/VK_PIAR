@@ -1,75 +1,118 @@
 import requests
 import time
 import os
+import threading
+import sys
 
 # ========== НАСТРОЙКИ ==========
 GROUP_TOKEN = "vk1.a.GENAzRdaR86f91rPAydFj660SgWD7ylgOKpjwrrPaDtgE64s3ZSMn02sa_QPL7IKcOsFIEgMK17_DlaTsjXVlpJb-a4eLqQcbEfCA4OnTcqbn5J5cjqwh-eyKrwxFbmdgJSKMY8PgIiwj8DRhOaOU3DvdDchvGw5ebC-ysGXDA9Cyg0-knFBsdhf_o__aoKHrR0RceQB658D-WjG5xBbqg"
 GROUP_ID = 239058698
-OWNER_ID = vk.com/club239058698
-
-# Храним связку: кому ответить
-# {owner_peer_id: client_peer_id}
-reply_map = {}
+ADMIN_CHAT_ID = 2000000062
+OWNER_LINK = "vk.com/club239058698"
 
 MESSAGES = [
-    f"""🔥 Давно хотел создать топовый проект?
+    f"""👑 SKREIFF SHOP
 
-Тогда тебе к нам!
+Здравствуйте, уважаемые участники!
 
-👾 Лучшая студия GTA SAMP, CRMP SKREIFF SHOP
+Если желаете развить свой проект и начать зарабатывать — тогда вам к нам!
 
-✅ Плюсы: низкие цены, выгодные товары, быстро и качественно
-❌ Минусы: их нет
+💎 Наши преимущества:
+✅ Дёшево
+✅ Выгодно
+✅ Качественно
 
-💻 Делаем: игры, сайты, форумы, ботов ВК/ТГ, автопиары
+🛍 Что мы предлагаем:
+🎮 CRMP и SAMP проекты
+🌐 Форумы
+💻 Сайты
+🤖 Боты ВК/ТГ (с VPN и без)
+📢 Автопиары
+⛏ Сервера Minecraft PE/Java
 
-📩 По всем вопросам: {OWNER_ID}""",
+💳 Принимаем оплаты на любых картах СНГ и детских
 
-    f"""🎮 SKREIFF SHOP — топовая студия
+📩 Писать только в сообщество (менеджеру):
+{OWNER_LINK}""",
 
-⚡ GTA SAMP / CRMP
-⚡ Игры, сайты, форумы
-⚡ Боты ВК и Telegram
-⚡ Автопиар
+    f"""⚡ SKREIFF SHOP
 
-Низкие цены, быстро, качественно!
+Здравствуйте, уважаемые участники!
 
-📩 {OWNER_ID}""",
+Хотите развить проект и зарабатывать?
+Мы поможем!
 
-    f"""💎 Нужен крутой проект?
+💎 Наши преимущества:
+✅ Дёшево
+✅ Выгодно
+✅ Качественно
 
-SKREIFF SHOP — студия с опытом
+🎮 CRMP и SAMP проекты
+🌐 Форумы | Сайты
+🤖 Боты ВК/ТГ
+📢 Автопиары
+⛏ Сервера Minecraft
 
-✔️ Разработка игр
-✔️ Создание сайтов
-✔️ Боты любой сложности
-✔️ Автопиар
-✔️ Готовые решения
+💳 Оплата на любые карты СНГ и детские
 
-По всем вопросам к менеджеру: {OWNER_ID}""",
+📩 Писать только в сообщество (менеджеру):
+{OWNER_LINK}""",
 
-    f"""🚀 Хочешь раскрутить проект?
+    f"""🔥 SKREIFF SHOP
 
-SKREIFF SHOP поможет!
+Здравствуйте, уважаемые участники!
 
-🔹 GTA SAMP сервера
-🔹 CRMP проекты
-🔹 Сайты и форумы
-🔹 Боты ВК/Telegram
-🔹 Автопиар
+Желаете развить свой проект и начать зарабатывать?
+Тогда вам к нам!
 
-Качество, скорость, низкие цены!
+💎 Дёшево • Выгодно • Качественно
 
-📩 Пиши: {OWNER_ID}""",
+🛍 Наши услуги:
+• CRMP и SAMP проекты
+• Форумы и сайты
+• Боты ВК/ТГ
+• Автопиары
+• Сервера Minecraft
+
+💳 Принимаем оплаты на любых картах СНГ и детских
+
+📩 Писать только в сообщество (менеджеру):
+{OWNER_LINK}""",
+
+    f"""💎 SKREIFF SHOP
+
+Здравствуйте, уважаемые участники!
+
+Развитие проекта и заработок — это к нам!
+
+✅ Дёшево
+✅ Выгодно
+✅ Качественно
+
+🎮 CRMP | SAMP проекты
+🌐 Форумы | Сайты
+🤖 Боты ВК/ТГ
+📢 Автопиары
+⛏ Minecraft сервера
+
+💳 Оплата: карты СНГ и детские
+
+📩 Писать только в сообщество (менеджеру):
+{OWNER_LINK}""",
 ]
 
-SEND_DELAY = 3
+SEND_DELAY = 2
 SPAM_INTERVAL = 60
 CHATS_FILE = "chats.txt"
+
+msg_index = 0
 # =================================
 
 VK_URL = "https://api.vk.com/method/"
 V = "5.199"
+
+def log(msg):
+    print(msg, flush=True)
 
 def load_chats():
     if os.path.exists(CHATS_FILE):
@@ -77,177 +120,181 @@ def load_chats():
             return [line.strip() for line in f if line.strip().isdigit()]
     return []
 
-def send_message(token, peer_id, message):
-    params = {
-        "access_token": token,
+def api(method, params):
+    params["access_token"] = GROUP_TOKEN
+    params["v"] = V
+    try:
+        resp = requests.get(VK_URL + method, params=params, timeout=5).json()
+        return resp
+    except:
+        return {"error": {"error_msg": "connection"}}
+
+def send_message(peer_id, message, silent=False):
+    resp = api("messages.send", {
         "peer_id": peer_id,
         "message": message,
-        "random_id": int(time.time() * 1000000),
-        "v": V
-    }
+        "random_id": int(time.time() * 1000000)
+    })
     
-    try:
-        resp = requests.get(VK_URL + "messages.send", params=params, timeout=10).json()
-        
-        if "error" in resp:
-            code = resp["error"]["error_code"]
-            if code == 9:
-                time.sleep(10)
-                return send_message(token, peer_id, message)
-            return False
-        return True
-    except:
+    if "error" in resp:
+        code = resp["error"]["error_code"]
+        if code == 9:
+            time.sleep(10)
+            return send_message(peer_id, message, silent)
+        if not silent:
+            if code not in [7, 902, 917, 912]:
+                log(f"  ❌ [{code}] {resp['error']['error_msg']}")
         return False
+    return True
 
-def get_user_name(token, user_id):
-    try:
-        params = {"access_token": token, "user_ids": user_id, "v": V}
-        resp = requests.get(VK_URL + "users.get", params=params, timeout=5).json()
-        users = resp.get("response", [])
-        if users:
-            return f"{users[0].get('first_name', '')} {users[0].get('last_name', '')}"
-    except:
-        pass
+def get_user_name(user_id):
+    resp = api("users.get", {"user_ids": user_id})
+    users = resp.get("response", [])
+    if users:
+        return f"{users[0].get('first_name', '')} {users[0].get('last_name', '')}"
     return f"id{user_id}"
 
-def forward_to_owner(token, from_id, text, client_peer_id):
-    """Пересылает сообщение из ЛС сообщества владельцу"""
-    name = get_user_name(token, from_id)
+# ====== СЛУШАЕМ ======
+def listener_thread():
+    global msg_index
     
-    # Сохраняем связку: диалог с владельцем → клиент
-    reply_map[OWNER_ID] = client_peer_id
+    resp = api("groups.getLongPollServer", {"group_id": GROUP_ID})
+    if "error" in resp:
+        log("❌ Ошибка LP")
+        return
     
-    msg = f"""📩 {name}
-👤 vk.com/id{from_id}
-
-💬 {text}
-
-➡️ Нажми «Ответить» и пиши — сообщение уйдёт клиенту"""
+    server = resp["response"]["server"]
+    key = resp["response"]["key"]
+    ts = resp["response"]["ts"]
     
-    send_message(token, OWNER_ID, msg)
-    print(f"[{time.strftime('%H:%M:%S')}] 📩 {name}: {text[:50]}", flush=True)
-
-def reply_to_client(token, owner_peer_id, text):
-    """Отправляет ответ клиенту от имени сообщества"""
-    client_peer_id = reply_map.get(owner_peer_id)
+    if not server.startswith("http"):
+        server = "https://" + server
     
-    if client_peer_id:
-        send_message(token, client_peer_id, text)
-        print(f"[{time.strftime('%H:%M:%S')}] 📤 Ответ → {client_peer_id}", flush=True)
-        return True
-    
-    return False
-
-def get_longpoll():
-    try:
-        params = {"access_token": GROUP_TOKEN, "group_id": GROUP_ID, "v": V}
-        resp = requests.get(VK_URL + "groups.getLongPollServer", params=params, timeout=10).json()
-        
-        if "error" in resp:
-            return None, None, None
-        
-        server = resp["response"]["server"]
-        key = resp["response"]["key"]
-        ts = resp["response"]["ts"]
-        
-        if not server.startswith("http"):
-            server = "https://" + server
-        
-        return server, key, ts
-    except:
-        return None, None, None
-
-def listen(server, key, ts):
-    try:
-        params = {"act": "a_check", "key": key, "ts": ts, "wait": 5}
-        resp = requests.get(server, params=params, timeout=10).json()
-        
-        if "failed" in resp:
-            return None, []
-        
-        return resp["ts"], resp.get("updates", [])
-    except:
-        return ts, []
-
-if __name__ == "__main__":
-    print(f"🤖 БОТ ЗАПУЩЕН", flush=True)
-    print(f"📩 ЛС → vk.com/id{OWNER_ID}", flush=True)
-    print(f"📤 Ответ через «Ответить»", flush=True)
-    print(f"⏱️ Пиар каждые {SPAM_INTERVAL} сек\n", flush=True)
-    
-    msg_index = 0
-    round_num = 0
-    last_spam = 0
-    
-    server, key, ts = get_longpoll()
-    if server:
-        print("👂 Слушаю...\n", flush=True)
+    log("👂 Слушаю...\n")
     
     while True:
         try:
-            if server:
-                new_ts, updates = listen(server, key, ts)
-                
-                if new_ts:
-                    ts = new_ts
-                
-                for upd in updates:
-                    if upd.get("type") == "message_new":
-                        msg = upd.get("object", {}).get("message", {})
-                        peer_id = msg.get("peer_id", 0)
-                        from_id = msg.get("from_id", 0)
-                        text = msg.get("text", "")
-                        action = msg.get("action", {})
-                        reply_to = msg.get("reply_message", {})
-                        
-                        # === ВЛАДЕЛЕЦ ОТВЕЧАЕТ (нажал «Ответить») ===
-                        if from_id == OWNER_ID and peer_id < 2000000000:
-                            if reply_to:
-                                # Ответ на пересланное сообщение → шлём клиенту
-                                reply_to_client(GROUP_TOKEN, peer_id, text)
-                            else:
-                                # Обычное сообщение от владельца — игнорим или обновляем связку
-                                pass
-                        
-                        # === ЛС СООБЩЕСТВА (клиент пишет) ===
-                        elif peer_id < 2000000000 and from_id > 0 and from_id != OWNER_ID and not action:
-                            forward_to_owner(GROUP_TOKEN, from_id, text, peer_id)
-                        
-                        # === ДОБАВИЛИ В БЕСЕДУ ===
-                        if peer_id > 2000000000 and action:
-                            if action.get("type") == "chat_invite_user":
-                                if action.get("member_id") == -GROUP_ID:
-                                    print(f"[{time.strftime('%H:%M:%S')}] 🎯 Беседа {peer_id}", flush=True)
-                                    msg_text = MESSAGES[msg_index % len(MESSAGES)]
-                                    msg_index += 1
-                                    send_message(GROUP_TOKEN, peer_id, msg_text)
+            params = {"act": "a_check", "key": key, "ts": ts, "wait": 10}
+            resp = requests.get(server, params=params, timeout=15)
+            data = resp.json()
             
-            # === ПИАР ===
-            if time.time() - last_spam >= SPAM_INTERVAL:
-                round_num += 1
-                chats = load_chats()
-                
-                if chats:
-                    message = MESSAGES[msg_index % len(MESSAGES)]
-                    msg_index += 1
-                    
-                    print(f"[{time.strftime('%H:%M:%S')}] 🔄 КРУГ {round_num}", flush=True)
-                    
-                    ok = 0
-                    for chat_id in chats:
-                        if send_message(GROUP_TOKEN, int(chat_id), message):
-                            ok += 1
-                            time.sleep(SEND_DELAY)
-                    
-                    print(f"[{time.strftime('%H:%M:%S')}] ✅ {ok}/{len(chats)}", flush=True)
-                
-                last_spam = time.time()
+            if "failed" in data:
+                resp2 = api("groups.getLongPollServer", {"group_id": GROUP_ID})
+                if "response" in resp2:
+                    server = resp2["response"]["server"]
+                    key = resp2["response"]["key"]
+                    ts = resp2["response"]["ts"]
+                    if not server.startswith("http"):
+                        server = "https://" + server
+                continue
             
-            time.sleep(1)
+            ts = data.get("ts", ts)
             
-        except KeyboardInterrupt:
-            print(f"\n👋 Завершено", flush=True)
-            break
+            for upd in data.get("updates", []):
+                if upd.get("type") == "message_new":
+                    msg = upd.get("object", {}).get("message", {})
+                    peer_id = msg.get("peer_id", 0)
+                    from_id = msg.get("from_id", 0)
+                    text = msg.get("text", "").strip()
+                    action = msg.get("action", {})
+                    
+                    # === ЛС ===
+                    if peer_id < 2000000000 and from_id > 0 and not action:
+                        if text.lower().startswith("/o"):
+                            continue
+                        
+                        name = get_user_name(from_id)
+                        forward = f"""📩 {name}
+🔗 vk.com/id{from_id}
+💬 {text}
+
+✏️ /o {from_id} ответ"""
+                        
+                        send_message(ADMIN_CHAT_ID, forward)
+                        log(f"[{time.strftime('%H:%M:%S')}] 📩 {name}: {text[:30]}")
+                    
+                    # === /o ===
+                    elif peer_id == ADMIN_CHAT_ID and text.lower().startswith("/o"):
+                        log(f"[{time.strftime('%H:%M:%S')}] 📝 /o от id{from_id}")
+                        
+                        parts = text.split(" ", 2)
+                        if len(parts) >= 3:
+                            try:
+                                client_id = int(parts[1])
+                                reply_text = parts[2]
+                                
+                                answer = f"""📩 Ответ от поддержки SKREIFF SHOP:
+
+{reply_text}"""
+                                
+                                result = send_message(client_id, answer)
+                                
+                                if result:
+                                    name = get_user_name(client_id)
+                                    send_message(ADMIN_CHAT_ID, f"✅ → {name}")
+                                    log(f"[{time.strftime('%H:%M:%S')}] 📤 {name}: {reply_text[:30]}")
+                                else:
+                                    send_message(ADMIN_CHAT_ID, "❌ Не отправлено")
+                                    log(f"[{time.strftime('%H:%M:%S')}] ❌ {client_id}")
+                            except:
+                                send_message(ADMIN_CHAT_ID, "❌ ID")
+                        else:
+                            send_message(ADMIN_CHAT_ID, "❌ /o ID текст")
+                    
+                    # === ДОБАВИЛИ В БЕСЕДУ ===
+                    if peer_id > 2000000000 and peer_id != ADMIN_CHAT_ID and action:
+                        if action.get("type") == "chat_invite_user":
+                            if action.get("member_id") == -GROUP_ID:
+                                msg_text = MESSAGES[msg_index % len(MESSAGES)]
+                                msg_index += 1
+                                send_message(peer_id, msg_text)
+        
+        except:
+            time.sleep(3)
+
+# ====== ПИАР ======
+def spammer_thread():
+    global msg_index
+    
+    log(f"⏱️ Пиар каждые {SPAM_INTERVAL} сек\n")
+    
+    round_num = 0
+    
+    while True:
+        try:
+            round_num += 1
+            chats = load_chats()
+            
+            if chats:
+                message = MESSAGES[msg_index % len(MESSAGES)]
+                msg_index += 1
+                
+                ok = 0
+                for chat_id in chats:
+                    if send_message(int(chat_id), message, silent=True):
+                        ok += 1
+                        time.sleep(SEND_DELAY)
+                
+                log(f"[{time.strftime('%H:%M:%S')}] 🔄 КРУГ {round_num} | ✅ {ok}/{len(chats)}")
+            
+            time.sleep(SPAM_INTERVAL)
+            
         except:
             time.sleep(5)
-            server, key, ts = get_longpoll()
+
+if __name__ == "__main__":
+    log(f"🤖 SKREIFF SHOP БОТ")
+    log(f"📩 ЛС → ЧАТ МЕНЕДЖЕР")
+    log(f"📤 /o ID текст\n")
+    
+    t1 = threading.Thread(target=listener_thread, daemon=True)
+    t1.start()
+    
+    t2 = threading.Thread(target=spammer_thread, daemon=True)
+    t2.start()
+    
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        log("\n👋 Стоп")
