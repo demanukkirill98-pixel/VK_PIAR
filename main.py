@@ -19,7 +19,8 @@ CHATS_FILE = "chats.txt"
 msg_index = 0
 last_user = None
 awaiting_reply = False
-last_keyboard_msg_id = None  # Храним ID сообщения с кнопкой
+# Храним ID сообщений с кнопками для каждого пользователя
+user_keyboard_msgs = {}  # {user_id: {"msg_id": xxx, "user_name": name}}
 
 VK_URL = "https://api.vk.com/method/"
 V = "5.199"
@@ -113,22 +114,17 @@ def send_message(peer_id, message, silent=False, keyboard=None, reply_to=None):
             time.sleep(10)
             return send_message(peer_id, message, silent, keyboard, reply_to)
         return False
-    
-    # Возвращаем ID отправленного сообщения
     return resp.get("response", 0)
 
-def edit_keyboard(peer_id, message_id, keyboard=None):
-    """Редактирует сообщение - убирает клавиатуру"""
+def edit_keyboard(peer_id, message_id):
+    """Убирает клавиатуру с сообщения"""
     params = {
         "peer_id": peer_id,
         "message_id": message_id,
-        "random_id": int(time.time() * 1000000)
+        "message": "👇 Кнопка использована",
+        "random_id": int(time.time() * 1000000),
+        "keyboard": json.dumps({"buttons": []})
     }
-    if keyboard:
-        params["keyboard"] = json.dumps(keyboard, ensure_ascii=False)
-    else:
-        params["keyboard"] = json.dumps({"buttons": []})  # Пустая клавиатура
-    
     resp = api("messages.edit", params)
     return "error" not in resp
 
@@ -147,7 +143,6 @@ def get_chat_name(peer_id):
     return "Без названия"
 
 def create_reply_keyboard(user_name):
-    """Клавиатура с кнопкой ответа (one_time=True - пропадёт после нажатия)"""
     return {
         "one_time": True,
         "buttons": [
@@ -156,7 +151,7 @@ def create_reply_keyboard(user_name):
                     "action": {
                         "type": "text",
                         "label": f"✏️ Ответить {user_name}",
-                        "payload": json.dumps({"action": "reply"})
+                        "payload": json.dumps({"action": "reply", "user_id": last_user["id"] if last_user else 0})
                     },
                     "color": "positive"
                 }
@@ -165,7 +160,7 @@ def create_reply_keyboard(user_name):
     }
 
 def listener_thread():
-    global msg_index, last_user, awaiting_reply, last_keyboard_msg_id
+    global msg_index, last_user, awaiting_reply, user_keyboard_msgs
     
     resp = api("groups.getLongPollServer", {"group_id": GROUP_ID})
     if "error" in resp:
@@ -223,6 +218,7 @@ def listener_thread():
                             name = get_user_name(from_id)
                             user_msg_id = msg.get("conversation_message_id", 0)
                             
+                            # Сохраняем последнего пользователя для ответа
                             last_user = {
                                 "id": from_id,
                                 "name": name,
@@ -233,19 +229,23 @@ def listener_thread():
                             
                             # Отправляем текст сообщения
                             send_message(ADMIN_CHAT_ID, f"👤 {name} (id{from_id}):\n\n{text}")
-                            # Отправляем сообщение с кнопкой и запоминаем его ID
-                            last_keyboard_msg_id = send_message(ADMIN_CHAT_ID, "👇 Нажмите кнопку чтобы ответить", keyboard=create_reply_keyboard(name))
+                            # Отправляем сообщение с кнопкой и сохраняем его ID для этого пользователя
+                            msg_id = send_message(ADMIN_CHAT_ID, f"👇 Нажмите кнопку чтобы ответить {name}", keyboard=create_reply_keyboard(name))
+                            if msg_id:
+                                user_keyboard_msgs[from_id] = {"msg_id": msg_id, "name": name}
                             log(f"[{time.strftime('%H:%M:%S')}] 📩 {name}: {text[:30]}")
                     
                     # === БЕСЕДА АДМИНА ===
                     elif peer_id == ADMIN_CHAT_ID:
                         # Нажатие на кнопку
                         if payload and payload.get("action") == "reply":
+                            user_id = payload.get("user_id", 0)
                             if last_user and not awaiting_reply:
                                 awaiting_reply = True
-                                # Убираем кнопку (редактируем сообщение)
-                                if last_keyboard_msg_id:
-                                    edit_keyboard(ADMIN_CHAT_ID, last_keyboard_msg_id)
+                                # Убираем кнопку для этого пользователя
+                                if last_user["id"] in user_keyboard_msgs:
+                                    edit_keyboard(ADMIN_CHAT_ID, user_keyboard_msgs[last_user["id"]]["msg_id"])
+                                    del user_keyboard_msgs[last_user["id"]]
                                 send_message(ADMIN_CHAT_ID, f"✏️ Напишите ответ для {last_user['name']}:")
                                 log(f"✏️ Ожидание ответа для {last_user['name']}")
                             else:
@@ -266,7 +266,6 @@ def listener_thread():
                                 send_message(ADMIN_CHAT_ID, "❌ Ошибка отправки")
                             
                             awaiting_reply = False
-                            last_keyboard_msg_id = None
                         
                         # === КОМАНДА /on ===
                         elif text and text.lower() == "/on":
