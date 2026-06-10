@@ -19,6 +19,9 @@ CHATS_FILE = "chats.txt"
 msg_index = 0
 last_user = None
 awaiting_reply = False
+awaiting_o_by_id = False  # Флаг для /o по ID
+target_user_id = None     # ID получателя
+target_user_name = None   # Имя получателя
 # Храним ID сообщений с кнопками для каждого пользователя
 user_keyboard_msgs = {}  # {user_id: {"msg_id": xxx, "user_name": name}}
 
@@ -160,7 +163,7 @@ def create_reply_keyboard(user_name):
     }
 
 def listener_thread():
-    global msg_index, last_user, awaiting_reply, user_keyboard_msgs
+    global msg_index, last_user, awaiting_reply, user_keyboard_msgs, awaiting_o_by_id, target_user_id, target_user_name
     
     resp = api("groups.getLongPollServer", {"group_id": GROUP_ID})
     if "error" in resp:
@@ -237,12 +240,11 @@ def listener_thread():
                     
                     # === БЕСЕДА АДМИНА ===
                     elif peer_id == ADMIN_CHAT_ID:
-                        # Нажатие на кнопку
+                        # Нажатие на кнопку (ответ последнему)
                         if payload and payload.get("action") == "reply":
                             user_id = payload.get("user_id", 0)
-                            if last_user and not awaiting_reply:
+                            if last_user and not awaiting_reply and not awaiting_o_by_id:
                                 awaiting_reply = True
-                                # Убираем кнопку для этого пользователя
                                 if last_user["id"] in user_keyboard_msgs:
                                     edit_keyboard(ADMIN_CHAT_ID, user_keyboard_msgs[last_user["id"]]["msg_id"])
                                     del user_keyboard_msgs[last_user["id"]]
@@ -251,10 +253,57 @@ def listener_thread():
                             else:
                                 send_message(ADMIN_CHAT_ID, "❌ Нет активного пользователя")
                         
-                        # Текст ответа
-                        elif text and awaiting_reply and last_user:
-                            answer = f"📩 Ответ от поддержки:\n\n{text}"
+                        # === КОМАНДА /o (ответ последнему) ===
+                        elif text and text.lower() == "/o":
+                            if not last_user:
+                                send_message(ADMIN_CHAT_ID, "❌ Нет активного пользователя (никто не писал в ЛС)")
+                                continue
                             
+                            awaiting_reply = True
+                            send_message(ADMIN_CHAT_ID, f"✏️ Введите сообщение для {last_user['name']} (или /cancel):")
+                            log(f"📝 /o для {last_user['name']}")
+                        
+                        # === КОМАНДА /o ID текст (отправить по ID) ===
+                        elif text and text.lower().startswith("/o "):
+                            parts = text.split(maxsplit=2)
+                            if len(parts) >= 2:
+                                # Проверяем, есть ли ID
+                                try:
+                                    user_id = int(parts[1])
+                                    # Если есть и текст сообщения
+                                    if len(parts) == 3:
+                                        # Отправляем сразу: /o 123456789 текст сообщения
+                                        message_text = parts[2]
+                                        user_name = get_user_name(user_id)
+                                        
+                                        answer = f"📩 Сообщение от поддержки:\n\n{message_text}"
+                                        result = send_message(user_id, answer)
+                                        
+                                        if result:
+                                            send_message(ADMIN_CHAT_ID, f"✅ Отправлено {user_name} (id{user_id})")
+                                            log(f"[{time.strftime('%H:%M:%S')}] 📤 {user_name} (id{user_id}): {message_text[:30]}")
+                                        else:
+                                            send_message(ADMIN_CHAT_ID, f"❌ Ошибка отправки id{user_id} (бот не в ЛС?)")
+                                    else:
+                                        # Только ID, ждём текст
+                                        target_user_id = user_id
+                                        target_user_name = get_user_name(user_id)
+                                        awaiting_o_by_id = True
+                                        send_message(ADMIN_CHAT_ID, f"✏️ Введите сообщение для {target_user_name} (id{target_user_id}) (или /cancel):")
+                                        log(f"📝 /o по ID {target_user_id} - ожидание текста")
+                                except ValueError:
+                                    send_message(ADMIN_CHAT_ID, "❌ Неверный формат ID. Пример: /o 123456789 текст")
+                            else:
+                                send_message(ADMIN_CHAT_ID, "❌ Использование: /o ID (затем ввести текст) или /o ID текст")
+                        
+                        # Текст ответа (для /o последнему или кнопки)
+                        elif text and awaiting_reply and last_user:
+                            if text.lower() == "/cancel":
+                                awaiting_reply = False
+                                send_message(ADMIN_CHAT_ID, "❌ Отправка отменена")
+                                continue
+                            
+                            answer = f"📩 Ответ от поддержки:\n\n{text}"
                             result = send_message(last_user["id"], answer, reply_to=last_user["msg_id"])
                             if not result:
                                 result = send_message(last_user["id"], answer)
@@ -266,6 +315,28 @@ def listener_thread():
                                 send_message(ADMIN_CHAT_ID, "❌ Ошибка отправки")
                             
                             awaiting_reply = False
+                        
+                        # Текст ответа для /o по ID
+                        elif text and awaiting_o_by_id and target_user_id:
+                            if text.lower() == "/cancel":
+                                awaiting_o_by_id = False
+                                target_user_id = None
+                                target_user_name = None
+                                send_message(ADMIN_CHAT_ID, "❌ Отправка отменена")
+                                continue
+                            
+                            answer = f"📩 Сообщение от поддержки:\n\n{text}"
+                            result = send_message(target_user_id, answer)
+                            
+                            if result:
+                                send_message(ADMIN_CHAT_ID, f"✅ Отправлено {target_user_name} (id{target_user_id})")
+                                log(f"[{time.strftime('%H:%M:%S')}] 📤 {target_user_name} (id{target_user_id}): {text[:30]}")
+                            else:
+                                send_message(ADMIN_CHAT_ID, f"❌ Ошибка отправки id{target_user_id} (бот не в ЛС?)")
+                            
+                            awaiting_o_by_id = False
+                            target_user_id = None
+                            target_user_name = None
                         
                         # === КОМАНДА /on ===
                         elif text and text.lower() == "/on":
@@ -332,7 +403,10 @@ if __name__ == "__main__":
     log(f"📝 Все кто пишут в ЛС → сохраняются в {IDS_FILE}")
     log(f"📢 Беседы → сохраняются в {CHATS_FILE}")
     log(f"⏱️ Пиар (без промокода) каждые {SPAM_INTERVAL} сек")
-    log(f"🎁 /on - рассылка промокода LETO\n")
+    log(f"🎁 /on - рассылка промокода LETO")
+    log(f"📨 /o - ответ последнему пользователю")
+    log(f"📨 /o ID - отправить по ID")
+    log(f"📨 /o ID текст - отправить сразу\n")
     
     t1 = threading.Thread(target=listener_thread, daemon=True)
     t1.start()
